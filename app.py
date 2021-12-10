@@ -30,7 +30,7 @@ def welcome():
         f"/api/v1.0/precipitation<br/>"
         f"/api/v1.0/stations<br/>"
         f"/api/v1.0/tobs<br/>"
-        f"'/api/v1.0/[start format:yyyy-mm-dd]<br/>"
+        f"/api/v1.0/[start format:yyyy-mm-dd]<br/>"
         f"/api/v1.0/[start format:yyyy-mm-dd]/[end format:yyyy-mm-dd]<br/>"
     )
 
@@ -72,10 +72,10 @@ def Station():
 def Tobs():
     session = Session(engine)
     # Query the last year's temperature observationof the most active station
-    temp_data = session.query(Measurement.date,Measurement.tobs)\
-           .filter(Measurement.date>='2016-08-24')\
-           .filter(Measurement.date<='2017-08-23')\
-           .filter(Measurement.station == 'USC00519281').all()
+    temp_data = session.query(Measurement.date,Measurement.tobs).\
+            filter(Measurement.date>='2016-08-24').\
+            filter(Measurement.date<='2017-08-23').\
+            filter(Measurement.station == 'USC00519281').all()
     session.close()
 
 
@@ -91,19 +91,34 @@ def Tobs():
     return jsonify(all_temp)
 
 @app.route('/api/v1.0/<start>')
-def Start(start):
+@app.route('/api/v1.0/<start>/<end>')
+def Start(start = None, end = None):
     session = Session(engine)
-    start = session.query(Measurement.date).\
-            group_by(Measurement.date).order_by(Measurement.date.asc()).first()
-    start_temp= session.query(func.min(Measurement.tobs),\
-                            func.max(Measurement.tobs),\
-                            func.avg(Measurement.tobs))\
-                            .filter(Measurement.date>= start).all()
+    if not end:
+        results = session.query(func.min(Measurement.tobs),\
+                                func.max(Measurement.tobs),\
+                                func.avg(Measurement.tobs)).\
+                                filter(Measurement.date>= start).all()
 
-    session.close()
+        start_date_temp = []
+        for min, avg, max in results:
+            starttemp_dict = {}
+            starttemp_dict["max"] = max
+            starttemp_dict["min"] = min
+            starttemp_dict["avg"] = avg
+
+            start_date_temp.append(starttemp_dict)
+
+        return jsonify(start_date_temp)
+    
+    results = session.query(func.min(Measurement.tobs),\
+                            func.max(Measurement.tobs),\
+                            func.avg(Measurement.tobs)).\
+                            filter(Measurement.date >= start).\
+                            filter(Measurement.date <= end).all()
 
     start_date_temp = []
-    for min, avg, max in start_temp:
+    for min, avg, max in results:
         starttemp_dict = {}
         starttemp_dict["max"] = max
         starttemp_dict["min"] = min
@@ -113,6 +128,7 @@ def Start(start):
 
     return jsonify(start_date_temp)
 
+    session.close()
 
 if __name__ == "__main__":
     app.run(debug=True)
